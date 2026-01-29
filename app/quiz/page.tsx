@@ -1,27 +1,66 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { quizQuestions } from '@/lib/mockData';
-import { QuizAnswer } from '@/lib/types';
+import SubjectHeader from '@/components/ui/SubjectHeader';
+import { quizQuestionsBySubject } from '@/lib/mockData';
+import { QuizAnswer, SubjectId } from '@/lib/types';
+import { analyzeQuiz } from '@/lib/api';
+import { useSubject } from '@/lib/SubjectContext';
 
 export default function QuizPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
+  const { selectedSubject, getSubjectInfo } = useSubject();
+
+  // Redirect to profile if no subject is selected
+  useEffect(() => {
+    if (!selectedSubject) {
+      setIsRedirecting(true);
+      router.push('/profile');
+      return;
+    }
+
+    // Validate subject ID - if invalid, clear state and redirect
+    const validSubjects: SubjectId[] = ['physics', 'mathematics', 'chemistry', 'biology'];
+    if (!validSubjects.includes(selectedSubject)) {
+      console.error('Invalid subject ID detected, redirecting to profile');
+      setIsRedirecting(true);
+      router.push('/profile');
+    }
+  }, [selectedSubject, router]);
+
+  // Get subject-specific questions
+  const quizQuestions = selectedSubject ? quizQuestionsBySubject[selectedSubject] : [];
+  const subjectInfo = selectedSubject ? getSubjectInfo(selectedSubject) : null;
 
   const currentQuestion = quizQuestions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
+
+  // Don't render if no subject or no questions
+  if (!selectedSubject || quizQuestions.length === 0 || isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleOptionSelect = (optionIndex: number) => {
     setSelectedOption(optionIndex);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (selectedOption !== null) {
       // Store the answer
       const newAnswer: QuizAnswer = {
@@ -43,8 +82,21 @@ export default function QuizPage() {
       setAnswers(updatedAnswers);
 
       if (isLastQuestion) {
-        // Navigate to dashboard
-        router.push('/dashboard');
+        // Submit quiz to backend and navigate to dashboard
+        setIsSubmitting(true);
+        try {
+          const result = await analyzeQuiz(updatedAnswers);
+          
+          // Store result in sessionStorage for dashboard to access
+          sessionStorage.setItem('quizResult', JSON.stringify(result));
+          
+          // Navigate to dashboard
+          router.push('/dashboard');
+        } catch (error) {
+          console.error('Failed to analyze quiz:', error);
+          // Still navigate to dashboard with mock data as fallback
+          router.push('/dashboard');
+        }
       } else {
         // Move to next question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -62,6 +114,9 @@ export default function QuizPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-6"
         >
+          {subjectInfo && (
+            <SubjectHeader subject={subjectInfo} className="mb-2" />
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
             Diagnostic Assessment
           </h1>
@@ -155,9 +210,9 @@ export default function QuizPage() {
                 onClick={handleNext}
                 variant="primary"
                 fullWidth
-                disabled={selectedOption === null}
+                disabled={selectedOption === null || isSubmitting}
               >
-                {isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
+                {isSubmitting ? 'Analyzing...' : isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
               </Button>
             </motion.div>
           </AnimatePresence>

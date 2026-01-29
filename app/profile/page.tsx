@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Chatbot from '@/components/ui/Chatbot';
+import { useSubject } from '@/lib/SubjectContext';
+import { SubjectId } from '@/lib/types';
 
 const subjects = [
   { 
@@ -41,9 +43,14 @@ const subjects = [
 export default function ProfilePage() {
   const [selectedSubject, setSelectedSubject] = useState<string | null>(null);
   const router = useRouter();
+  const { setSelectedSubject: setGlobalSubject } = useSubject();
 
   const handleStartQuiz = () => {
     if (selectedSubject) {
+      // Clear any previous quiz results
+      sessionStorage.removeItem('quizResult');
+      
+      setGlobalSubject(selectedSubject as SubjectId);
       router.push('/quiz');
     }
   };
