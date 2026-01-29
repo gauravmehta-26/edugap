@@ -1,0 +1,168 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { quizQuestions } from '@/lib/mockData';
+import { QuizAnswer } from '@/lib/types';
+
+export default function QuizPage() {
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<QuizAnswer[]>([]);
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const router = useRouter();
+
+  const currentQuestion = quizQuestions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
+
+  const handleOptionSelect = (optionIndex: number) => {
+    setSelectedOption(optionIndex);
+  };
+
+  const handleNext = () => {
+    if (selectedOption !== null) {
+      // Store the answer
+      const newAnswer: QuizAnswer = {
+        questionId: currentQuestion.id,
+        selectedOption: selectedOption,
+      };
+      
+      const updatedAnswers = [...answers];
+      const existingAnswerIndex = updatedAnswers.findIndex(
+        (a) => a.questionId === currentQuestion.id
+      );
+      
+      if (existingAnswerIndex >= 0) {
+        updatedAnswers[existingAnswerIndex] = newAnswer;
+      } else {
+        updatedAnswers.push(newAnswer);
+      }
+      
+      setAnswers(updatedAnswers);
+
+      if (isLastQuestion) {
+        // Navigate to dashboard
+        router.push('/dashboard');
+      } else {
+        // Move to next question
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+        setSelectedOption(null);
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full max-w-3xl">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-6"
+        >
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
+            Diagnostic Assessment
+          </h1>
+          <p className="text-sm sm:text-base text-gray-600">
+            Answer all questions to identify your learning gaps
+          </p>
+        </motion.div>
+
+        <Card className="backdrop-blur-sm bg-white/90">
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+                  Question {currentQuestionIndex + 1}
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600">
+                  of {quizQuestions.length} questions
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  {Math.round(((currentQuestionIndex + 1) / quizQuestions.length) * 100)}%
+                </div>
+                <p className="text-xs text-gray-600">Complete</p>
+              </div>
+            </div>
+            
+            {/* Enhanced Progress bar */}
+            <div className="relative w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+              <motion.div
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg"
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${((currentQuestionIndex + 1) / quizQuestions.length) * 100}%`,
+                }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+              />
+            </div>
+          </div>
+
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentQuestion.id}
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ duration: 0.3 }}
+            >
+              <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border-2 border-blue-100">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                  {currentQuestion.question}
+                </h3>
+              </div>
+
+              <div className="space-y-3 mb-8">
+                {currentQuestion.options.map((option, index) => (
+                  <motion.button
+                    key={index}
+                    onClick={() => handleOptionSelect(index)}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                      selectedOption === index
+                        ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-purple-50 shadow-lg ring-2 ring-blue-200'
+                        : 'border-gray-300 hover:border-blue-400 bg-white hover:shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <div
+                        className={`w-6 h-6 rounded-full border-2 mr-3 flex items-center justify-center flex-shrink-0 transition-all ${
+                          selectedOption === index
+                            ? 'border-blue-600 bg-blue-600 shadow-md'
+                            : 'border-gray-400'
+                        }`}
+                      >
+                        {selectedOption === index && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-2 h-2 bg-white rounded-full"
+                          />
+                        )}
+                      </div>
+                      <span className="text-sm sm:text-base text-gray-800 font-medium">{option}</span>
+                    </div>
+                  </motion.button>
+                ))}
+              </div>
+
+              <Button
+                onClick={handleNext}
+                variant="primary"
+                fullWidth
+                disabled={selectedOption === null}
+              >
+                {isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
+              </Button>
+            </motion.div>
+          </AnimatePresence>
+        </Card>
+      </div>
+    </div>
+  );
+}
