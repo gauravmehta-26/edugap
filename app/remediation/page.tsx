@@ -1,21 +1,72 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { remediationContent } from '@/lib/mockData';
 import ConceptContent from '@/components/remediation/ConceptContent';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
+import { getRemediation, RemediationResponse } from '@/lib/api';
 
-export default function RemediationPage() {
+function RemediationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const conceptId = searchParams.get('concept');
   const [isFixed, setIsFixed] = useState(false);
+  const [content, setContent] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  // Handle missing concept ID
-  if (!conceptId || !remediationContent[conceptId]) {
+  useEffect(() => {
+    async function fetchContent() {
+      if (!conceptId) {
+        setError(true);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Try to fetch from API first
+        const apiContent = await getRemediation(conceptId);
+        setContent({
+          title: apiContent.concept,
+          explanation: apiContent.explanation,
+          example: apiContent.example,
+          commonMistake: apiContent.commonMistake,
+          tip: apiContent.tip,
+        });
+        setIsLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch from API, using mock data:', err);
+        // Fall back to mock data
+        if (remediationContent[conceptId]) {
+          setContent(remediationContent[conceptId]);
+          setIsLoading(false);
+        } else {
+          setError(true);
+          setIsLoading(false);
+        }
+      }
+    }
+
+    fetchContent();
+  }, [conceptId]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading remediation content...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle missing concept ID or error
+  if (error || !content) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <motion.div
@@ -42,8 +93,6 @@ export default function RemediationPage() {
       </div>
     );
   }
-
-  const content = remediationContent[conceptId];
 
   const handleMarkAsFixed = () => {
     setIsFixed(true);
@@ -132,5 +181,20 @@ export default function RemediationPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function RemediationPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <RemediationContent />
+    </Suspense>
   );
 }

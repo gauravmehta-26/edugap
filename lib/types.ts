@@ -13,9 +13,10 @@ export interface QuizAnswer {
 }
 
 export interface WeakConcept {
-  id: string;
+  id: string | number;
   name: string;
-  riskPercentage: number;
+  riskPercentage?: number;
+  severity?: 'high' | 'medium' | 'low';
 }
 
 export interface DashboardData {

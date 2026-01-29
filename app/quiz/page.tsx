@@ -7,11 +7,13 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { quizQuestions } from '@/lib/mockData';
 import { QuizAnswer } from '@/lib/types';
+import { analyzeQuiz } from '@/lib/api';
 
 export default function QuizPage() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>([]);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
   const currentQuestion = quizQuestions[currentQuestionIndex];
@@ -21,7 +23,7 @@ export default function QuizPage() {
     setSelectedOption(optionIndex);
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (selectedOption !== null) {
       // Store the answer
       const newAnswer: QuizAnswer = {
@@ -43,8 +45,21 @@ export default function QuizPage() {
       setAnswers(updatedAnswers);
 
       if (isLastQuestion) {
-        // Navigate to dashboard
-        router.push('/dashboard');
+        // Submit quiz to backend and navigate to dashboard
+        setIsSubmitting(true);
+        try {
+          const result = await analyzeQuiz(updatedAnswers);
+          
+          // Store result in sessionStorage for dashboard to access
+          sessionStorage.setItem('quizResult', JSON.stringify(result));
+          
+          // Navigate to dashboard
+          router.push('/dashboard');
+        } catch (error) {
+          console.error('Failed to analyze quiz:', error);
+          // Still navigate to dashboard with mock data as fallback
+          router.push('/dashboard');
+        }
       } else {
         // Move to next question
         setCurrentQuestionIndex(currentQuestionIndex + 1);
@@ -155,9 +170,9 @@ export default function QuizPage() {
                 onClick={handleNext}
                 variant="primary"
                 fullWidth
-                disabled={selectedOption === null}
+                disabled={selectedOption === null || isSubmitting}
               >
-                {isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
+                {isSubmitting ? 'Analyzing...' : isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
               </Button>
             </motion.div>
           </AnimatePresence>

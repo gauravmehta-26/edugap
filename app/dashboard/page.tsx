@@ -1,13 +1,40 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { dashboardData } from '@/lib/mockData';
 import RiskCard from '@/components/dashboard/RiskCard';
 import WeakConceptsList from '@/components/dashboard/WeakConceptsList';
 import PerformanceCharts from '@/components/dashboard/PerformanceCharts';
 import Chatbot from '@/components/ui/Chatbot';
+import { AnalyzeResponse } from '@/lib/api';
 
 export default function DashboardPage() {
+  const [quizResult, setQuizResult] = useState<AnalyzeResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Try to get quiz result from sessionStorage
+    const storedResult = sessionStorage.getItem('quizResult');
+    if (storedResult) {
+      try {
+        const result = JSON.parse(storedResult);
+        setQuizResult(result);
+      } catch (error) {
+        console.error('Failed to parse quiz result:', error);
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Use API result if available, otherwise fall back to mock data
+  const riskPercentage = quizResult?.failureRisk ?? dashboardData.examFailureRisk;
+  const weakConcepts = quizResult?.weakConcepts.map((concept, index) => ({
+    id: index + 1,
+    name: concept,
+    severity: 'high' as const,
+  })) ?? dashboardData.weakConcepts;
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -26,6 +53,17 @@ export default function DashboardPage() {
       transition: { duration: 0.5 },
     },
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading your results...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 sm:p-6 lg:p-8">
@@ -57,10 +95,10 @@ export default function DashboardPage() {
           variants={itemVariants}
         >
           <div className="lg:col-span-1">
-            <RiskCard riskPercentage={dashboardData.examFailureRisk} />
+            <RiskCard riskPercentage={riskPercentage} />
           </div>
           <div className="lg:col-span-2">
-            <WeakConceptsList concepts={dashboardData.weakConcepts} />
+            <WeakConceptsList concepts={weakConcepts} />
           </div>
         </motion.div>
 
