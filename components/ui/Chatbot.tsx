@@ -134,8 +134,12 @@ export default function Chatbot() {
               {/* Header */}
               <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white p-4 flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                    <span className="text-2xl">🤖</span>
+                  <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="/q-logo.svg" 
+                      alt="Q Logo" 
+                      className="w-7 h-7"
+                    />
                   </div>
                   <div>
                     <h3 className="font-bold text-lg">Study Assistant</h3>

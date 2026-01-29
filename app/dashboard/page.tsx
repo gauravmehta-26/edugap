@@ -1,17 +1,41 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { dashboardData } from '@/lib/mockData';
+import { dashboardData, weakConceptsBySubject, subjectPerformanceBySubject } from '@/lib/mockData';
 import RiskCard from '@/components/dashboard/RiskCard';
 import WeakConceptsList from '@/components/dashboard/WeakConceptsList';
 import PerformanceCharts from '@/components/dashboard/PerformanceCharts';
 import Chatbot from '@/components/ui/Chatbot';
+import SubjectHeader from '@/components/ui/SubjectHeader';
 import { AnalyzeResponse } from '@/lib/api';
+import { useSubject } from '@/lib/SubjectContext';
+import { SubjectId } from '@/lib/types';
 
 export default function DashboardPage() {
+  const { selectedSubject, getSubjectInfo } = useSubject();
+  const router = useRouter();
   const [quizResult, setQuizResult] = useState<AnalyzeResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Redirect to profile if no subject is selected
+  useEffect(() => {
+    if (!selectedSubject) {
+      setIsRedirecting(true);
+      router.push('/profile');
+      return;
+    }
+
+    // Validate subject ID - if invalid, clear state and redirect
+    const validSubjects: SubjectId[] = ['physics', 'mathematics', 'chemistry', 'biology'];
+    if (!validSubjects.includes(selectedSubject)) {
+      console.error('Invalid subject ID detected, redirecting to profile');
+      setIsRedirecting(true);
+      router.push('/profile');
+    }
+  }, [selectedSubject, router]);
 
   useEffect(() => {
     // Try to get quiz result from sessionStorage
@@ -19,21 +43,62 @@ export default function DashboardPage() {
     if (storedResult) {
       try {
         const result = JSON.parse(storedResult);
+        console.log('Loaded quiz result from sessionStorage:', result);
         setQuizResult(result);
+        
+        // Clear the stored result so it doesn't interfere with future quizzes
+        // Comment this out if you want results to persist across page refreshes
+        sessionStorage.removeItem('quizResult');
       } catch (error) {
         console.error('Failed to parse quiz result:', error);
       }
+    } else {
+      console.log('No quiz result in sessionStorage, using mock data');
     }
     setIsLoading(false);
   }, []);
 
-  // Use API result if available, otherwise fall back to mock data
-  const riskPercentage = quizResult?.failureRisk ?? dashboardData.examFailureRisk;
-  const weakConcepts = quizResult?.weakConcepts.map((concept, index) => ({
-    id: index + 1,
-    name: concept,
-    severity: 'high' as const,
-  })) ?? dashboardData.weakConcepts;
+  // Use API result if available, otherwise fall back to subject-specific mock data
+  const subjectWeakConcepts = selectedSubject ? weakConceptsBySubject[selectedSubject] : [];
+  const subjectPerformance = selectedSubject ? subjectPerformanceBySubject[selectedSubject] : dashboardData.subjectPerformance;
+  
+  // Calculate subject-specific risk percentage (average of weak concept risks)
+  const subjectRiskPercentage = subjectWeakConcepts.length > 0
+    ? Math.round(subjectWeakConcepts.reduce((sum, concept) => sum + (concept.riskPercentage || 0), 0) / subjectWeakConcepts.length)
+    : dashboardData.examFailureRisk;
+  
+  // TODO: API needs to be updated to handle subject-specific questions
+  // For now, always use subject-specific mock data since API doesn't know about subjects
+  // Use API result if available and has data, otherwise use subject-specific mock data
+  // const riskPercentage = (quizResult?.failureRisk !== undefined && quizResult?.failureRisk !== null) 
+  //   ? quizResult.failureRisk 
+  //   : subjectRiskPercentage;
+  const riskPercentage = subjectRiskPercentage; // Always use subject-specific data
+    
+  // const weakConcepts = (quizResult?.weakConcepts && quizResult.weakConcepts.length > 0)
+  //   ? quizResult.weakConcepts.map((concept, index) => ({
+  //       id: `concept-${index}`,
+  //       name: concept,
+  //       riskPercentage: 75, // Default risk for API-provided concepts
+  //       subject: selectedSubject!,
+  //     }))
+  //   : subjectWeakConcepts;
+  const weakConcepts = subjectWeakConcepts; // Always use subject-specific data
+
+  // Debug logging
+  console.log('Dashboard data:', {
+    selectedSubject,
+    hasQuizResult: !!quizResult,
+    quizResultFailureRisk: quizResult?.failureRisk,
+    subjectRiskPercentage,
+    finalRiskPercentage: riskPercentage,
+    weakConceptsCount: weakConcepts.length,
+    weakConceptsData: weakConcepts,
+    performanceDataPoints: subjectPerformance.length
+  });
+
+  // Get subject info for display
+  const subjectInfo = selectedSubject ? getSubjectInfo(selectedSubject) : null;
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -54,7 +119,7 @@ export default function DashboardPage() {
     },
   };
 
-  if (isLoading) {
+  if (isLoading || isRedirecting) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
@@ -78,9 +143,9 @@ export default function DashboardPage() {
           className="text-center mb-8 sm:mb-12"
           variants={itemVariants}
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-xl">
-            <span className="text-3xl">📊</span>
-          </div>
+          {subjectInfo && (
+            <SubjectHeader subject={subjectInfo} className="mb-4" />
+          )}
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
             Your Learning Dashboard
           </h1>
@@ -104,7 +169,7 @@ export default function DashboardPage() {
 
         {/* Charts section */}
         <motion.div variants={itemVariants}>
-          <PerformanceCharts subjectPerformance={dashboardData.subjectPerformance} />
+          <PerformanceCharts subjectPerformance={subjectPerformance} />
         </motion.div>
       </motion.div>
 

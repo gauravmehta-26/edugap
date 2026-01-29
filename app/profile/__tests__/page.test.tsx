@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import ProfilePage from '../page';
+import { SubjectProvider } from '@/lib/SubjectContext';
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -14,6 +15,15 @@ jest.mock('@/components/ui/Chatbot', () => {
   };
 });
 
+// Helper function to render with SubjectProvider
+const renderWithProvider = (component: React.ReactElement) => {
+  return render(
+    <SubjectProvider>
+      {component}
+    </SubjectProvider>
+  );
+};
+
 describe('ProfilePage', () => {
   const mockPush = jest.fn();
 
@@ -25,7 +35,7 @@ describe('ProfilePage', () => {
   });
 
   it('renders profile page with subject selection', () => {
-    render(<ProfilePage />);
+    renderWithProvider(<ProfilePage />);
     
     expect(screen.getByText('Select Your Subject')).toBeInTheDocument();
     expect(screen.getByText('Physics')).toBeInTheDocument();
@@ -35,7 +45,7 @@ describe('ProfilePage', () => {
   });
 
   it('allows selecting a subject', () => {
-    render(<ProfilePage />);
+    renderWithProvider(<ProfilePage />);
     
     const physicsCard = screen.getByText('Physics').closest('div')?.parentElement?.parentElement;
     expect(physicsCard).toBeInTheDocument();
@@ -47,7 +57,7 @@ describe('ProfilePage', () => {
   });
 
   it('enables start quiz button when subject is selected', () => {
-    render(<ProfilePage />);
+    renderWithProvider(<ProfilePage />);
     
     // Initially button shows "Select a Subject to Continue"
     const startButton = screen.getByRole('button', { name: /Select a Subject to Continue/i });
@@ -64,7 +74,7 @@ describe('ProfilePage', () => {
   });
 
   it('navigates to quiz page when start button is clicked', () => {
-    render(<ProfilePage />);
+    renderWithProvider(<ProfilePage />);
     
     // Select a subject
     const physicsCard = screen.getByText('Physics').closest('div')?.parentElement?.parentElement;
@@ -80,12 +90,44 @@ describe('ProfilePage', () => {
   });
 
   it('displays profile statistics', () => {
-    render(<ProfilePage />);
+    renderWithProvider(<ProfilePage />);
     
     expect(screen.getByText('Your Learning Journey')).toBeInTheDocument();
     expect(screen.getByText('Quizzes Taken')).toBeInTheDocument();
     expect(screen.getByText('Avg Score')).toBeInTheDocument();
     expect(screen.getByText('Concepts Fixed')).toBeInTheDocument();
     expect(screen.getByText('Study Hours')).toBeInTheDocument();
+  });
+
+  it('stores selected subject in global context when start button is clicked', () => {
+    let capturedSubject: string | null = null;
+    
+    // Create a test component that captures the subject from context
+    const TestWrapper = ({ children }: { children: React.ReactNode }) => {
+      const { selectedSubject } = require('@/lib/SubjectContext').useSubject();
+      capturedSubject = selectedSubject;
+      return <>{children}</>;
+    };
+    
+    render(
+      <SubjectProvider>
+        <TestWrapper>
+          <ProfilePage />
+        </TestWrapper>
+      </SubjectProvider>
+    );
+    
+    // Select a subject
+    const physicsCard = screen.getByText('Physics').closest('div')?.parentElement?.parentElement;
+    if (physicsCard) {
+      fireEvent.click(physicsCard);
+    }
+    
+    // Click start button
+    const startButton = screen.getByRole('button', { name: /Start Diagnostic Quiz/i });
+    fireEvent.click(startButton);
+    
+    // Verify subject was stored in context
+    expect(capturedSubject).toBe('physics');
   });
 });

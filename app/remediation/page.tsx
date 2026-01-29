@@ -3,23 +3,50 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import { motion } from 'framer-motion';
-import { remediationContent } from '@/lib/mockData';
+import { remediationContentBySubject } from '@/lib/mockData';
 import ConceptContent from '@/components/remediation/ConceptContent';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
-import { getRemediation, RemediationResponse } from '@/lib/api';
+import SubjectHeader from '@/components/ui/SubjectHeader';
+import { getRemediation } from '@/lib/api';
+import { useSubject } from '@/lib/SubjectContext';
+import { SubjectId } from '@/lib/types';
 
 function RemediationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { selectedSubject, getSubjectInfo } = useSubject();
   const conceptId = searchParams.get('concept');
   const [isFixed, setIsFixed] = useState(false);
   const [content, setContent] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState(false);
+
+  // Redirect to profile if no subject is selected
+  useEffect(() => {
+    if (!selectedSubject) {
+      setIsRedirecting(true);
+      router.push('/profile');
+      return;
+    }
+
+    // Validate subject ID - if invalid, clear state and redirect
+    const validSubjects: SubjectId[] = ['physics', 'mathematics', 'chemistry', 'biology'];
+    if (!validSubjects.includes(selectedSubject)) {
+      console.error('Invalid subject ID detected, redirecting to profile');
+      setIsRedirecting(true);
+      router.push('/profile');
+    }
+  }, [selectedSubject, router]);
 
   useEffect(() => {
     async function fetchContent() {
+      // Don't fetch if no subject is selected (will redirect)
+      if (!selectedSubject) {
+        return;
+      }
+
       if (!conceptId) {
         setError(true);
         setIsLoading(false);
@@ -30,18 +57,21 @@ function RemediationContent() {
         // Try to fetch from API first
         const apiContent = await getRemediation(conceptId);
         setContent({
-          title: apiContent.concept,
+          conceptId: conceptId,
+          conceptName: apiContent.concept,
+          subject: selectedSubject,
           explanation: apiContent.explanation,
           example: apiContent.example,
           commonMistake: apiContent.commonMistake,
-          tip: apiContent.tip,
         });
         setIsLoading(false);
       } catch (err) {
         console.error('Failed to fetch from API, using mock data:', err);
-        // Fall back to mock data
-        if (remediationContent[conceptId]) {
-          setContent(remediationContent[conceptId]);
+        // Fall back to subject-specific mock data
+        const subjectContent = remediationContentBySubject[selectedSubject];
+        if (subjectContent && subjectContent[conceptId]) {
+          const mockContent = subjectContent[conceptId];
+          setContent(mockContent);
           setIsLoading(false);
         } else {
           setError(true);
@@ -51,10 +81,10 @@ function RemediationContent() {
     }
 
     fetchContent();
-  }, [conceptId]);
+  }, [conceptId, selectedSubject]);
 
   // Loading state
-  if (isLoading) {
+  if (isLoading || isRedirecting) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <div className="text-center">
@@ -83,7 +113,11 @@ function RemediationContent() {
               Concept Not Found
             </h1>
             <p className="text-base text-gray-600 mb-6">
-              The concept you're looking for doesn't exist or has been removed.
+              {!conceptId 
+                ? "No concept was specified. Please select a concept from the dashboard."
+                : selectedSubject
+                ? `The concept you're looking for doesn't exist for ${getSubjectInfo(selectedSubject).name}.`
+                : "The concept you're looking for doesn't exist or has been removed."}
             </p>
             <Button onClick={() => router.push('/dashboard')} fullWidth>
               ← Return to Dashboard
@@ -96,9 +130,7 @@ function RemediationContent() {
 
   const handleMarkAsFixed = () => {
     setIsFixed(true);
-    setTimeout(() => {
-      setIsFixed(false);
-    }, 2000);
+    // Keep the fixed state persistent - don't reset it
   };
 
   return (
@@ -110,9 +142,9 @@ function RemediationContent() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-xl">
-            <span className="text-3xl">📚</span>
-          </div>
+          {selectedSubject && (
+            <SubjectHeader subject={getSubjectInfo(selectedSubject)} className="mb-4" />
+          )}
           <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
             Learn & Improve
           </h1>
