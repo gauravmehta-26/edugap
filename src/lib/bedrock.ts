@@ -12,37 +12,42 @@ export const bedrockClient = new BedrockRuntimeClient({
   },
 });
 
-// Model IDs
-const CLAUDE_MODEL_ID = "anthropic.claude-3-sonnet-20240229-v1:0";
-
-interface BedrockMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+// Model IDs - Using Amazon Nova Pro (allowed in hackathon)
+const NOVA_MODEL_ID = "amazon.nova-pro-v1:0";
 
 /**
- * Invoke Claude model via Bedrock
+ * Invoke Amazon Nova model via Bedrock
+ * Using Nova Pro for intelligent quiz analysis and remediation
  */
 export async function invokeClaude(
   prompt: string,
   systemPrompt?: string,
 ): Promise<string> {
-  const messages: BedrockMessage[] = [
-    {
-      role: "user",
-      content: prompt,
-    },
-  ];
+  // Combine system prompt and user prompt for Nova
+  const fullPrompt = systemPrompt
+    ? `${systemPrompt}\n\n${prompt}`
+    : prompt;
 
   const payload = {
-    anthropic_version: "bedrock-2023-05-31",
-    max_tokens: 2000,
-    messages,
-    ...(systemPrompt && { system: systemPrompt }),
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            text: fullPrompt,
+          },
+        ],
+      },
+    ],
+    inferenceConfig: {
+      max_new_tokens: 2000,
+      temperature: 0.7,
+      top_p: 0.9,
+    },
   };
 
   const command = new InvokeModelCommand({
-    modelId: CLAUDE_MODEL_ID,
+    modelId: NOVA_MODEL_ID,
     contentType: "application/json",
     accept: "application/json",
     body: JSON.stringify(payload),
@@ -51,5 +56,6 @@ export async function invokeClaude(
   const response = await bedrockClient.send(command);
   const responseBody = JSON.parse(new TextDecoder().decode(response.body));
 
-  return responseBody.content[0].text;
+  // Extract text from Nova response format
+  return responseBody.output.message.content[0].text;
 }
