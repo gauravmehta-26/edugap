@@ -23,12 +23,16 @@ export interface QuizQuestion {
   question: string;
   options: string[];
   correctAnswer: number;
-  subject: SubjectId;
+  subject?: SubjectId;
+  topic?: string;
+  difficulty?: string;
 }
 
 export interface QuizAnswer {
   questionId: string;
   selectedOption: number;
+  correctAnswer?: number;
+  topic?: string;
 }
 
 // Dashboard-related types

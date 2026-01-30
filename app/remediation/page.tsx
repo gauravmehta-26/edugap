@@ -8,6 +8,7 @@ import ConceptContent from '@/components/remediation/ConceptContent';
 import Button from '@/components/ui/Button';
 import Card from '@/components/ui/Card';
 import SubjectHeader from '@/components/ui/SubjectHeader';
+import Chatbot from '@/components/ui/Chatbot';
 import { getRemediation } from '@/lib/api';
 import { useSubject } from '@/lib/SubjectContext';
 import { SubjectId } from '@/lib/types';
@@ -54,8 +55,8 @@ function RemediationContent() {
       }
 
       try {
-        // Try to fetch from API first
-        const apiContent = await getRemediation(conceptId);
+        // Try to fetch from API first (will use AI if configured)
+        const apiContent = await getRemediation(conceptId, selectedSubject);
         setContent({
           conceptId: conceptId,
           conceptName: apiContent.concept,
@@ -63,6 +64,11 @@ function RemediationContent() {
           explanation: apiContent.explanation,
           example: apiContent.example,
           commonMistake: apiContent.commonMistake,
+          keyPoints: apiContent.keyPoints,
+          examples: apiContent.examples,
+          studyResources: apiContent.studyResources,
+          youtubeSearchQuery: apiContent.youtubeSearchQuery,
+          source: apiContent.source,
         });
         setIsLoading(false);
       } catch (err) {
@@ -211,6 +217,12 @@ function RemediationContent() {
             Back to Dashboard
           </button>
         </motion.div>
+
+        {/* Chatbot with context */}
+        <Chatbot 
+          subject={selectedSubject || undefined}
+          context="remediation"
+        />
       </div>
     </div>
   );

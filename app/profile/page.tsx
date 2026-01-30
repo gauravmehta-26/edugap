@@ -198,8 +198,11 @@ export default function ProfilePage() {
         </motion.div>
       </motion.div>
 
-      {/* Chatbot */}
-      <Chatbot />
+      {/* Chatbot with context */}
+      <Chatbot 
+        subject={selectedSubject || undefined}
+        context="profile"
+      />
     </div>
   );
 }

@@ -9,22 +9,41 @@ interface Message {
   text: string;
   sender: 'user' | 'bot';
   timestamp: Date;
+  isLoading?: boolean;
 }
 
-export default function Chatbot() {
+interface ChatbotProps {
+  subject?: string;
+  context?: 'dashboard' | 'profile' | 'remediation';
+  weakConcepts?: string[];
+}
+
+export default function Chatbot({ subject, context, weakConcepts }: ChatbotProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: 'Hello there! What can I do to lend a hand? 👋',
+      text: getWelcomeMessage(context, subject),
       sender: 'bot',
       timestamp: new Date(),
     },
   ]);
   const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
+  function getWelcomeMessage(ctx?: string, subj?: string): string {
+    if (ctx === 'dashboard') {
+      return "Hi! I'm here to help you understand your quiz results and improve your weak areas. Ask me anything! 📊";
+    } else if (ctx === 'remediation' && subj) {
+      return `Hello! I can help you master ${subj} concepts. Ask me to explain anything you're confused about! 📚`;
+    } else if (ctx === 'profile' && subj) {
+      return `Ready to ace your ${subj} quiz? I'm here to help you prepare. Ask me any questions! 🎯`;
+    }
+    return 'Hello there! What can I do to lend a hand? 👋';
+  }
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || isTyping) return;
 
     // Add user message
     const userMessage: Message = {
@@ -35,46 +54,77 @@ export default function Chatbot() {
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const userInput = inputValue;
     setInputValue('');
+    setIsTyping(true);
 
-    // Simulate bot response
-    setTimeout(() => {
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getBotResponse(inputValue),
-        sender: 'bot',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, botMessage]);
-    }, 1000);
-  };
+    // Add loading message
+    const loadingMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: '...',
+      sender: 'bot',
+      timestamp: new Date(),
+      isLoading: true,
+    };
+    setMessages((prev) => [...prev, loadingMessage]);
 
-  const getBotResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase();
+    try {
+      // Call AI API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userInput,
+          subject,
+          context,
+          weakConcepts,
+        }),
+      });
 
-    // Study-related responses
-    if (input.includes('help') || input.includes('study')) {
-      return "I'm here to help with your studies! You can ask me about concepts, get study tips, or clarify any doubts you have. What would you like to know?";
-    }
-    if (input.includes('quiz') || input.includes('test')) {
-      return 'You can take diagnostic quizzes to identify your weak areas. After completing a quiz, check your dashboard for personalized recommendations!';
-    }
-    if (input.includes('concept') || input.includes('topic')) {
-      return 'I can help explain concepts! Visit the remediation page after your quiz to get detailed explanations and practice problems for topics you need to work on.';
-    }
-    if (input.includes('score') || input.includes('performance')) {
-      return 'Your performance metrics are available on the dashboard. You can track your progress, see weak concepts, and monitor your improvement over time.';
-    }
-    if (input.includes('subject')) {
-      return 'We offer courses in Physics, Mathematics, Chemistry, and Biology. Select a subject from the profile page to start your diagnostic assessment!';
-    }
+      if (!response.ok) {
+        throw new Error('Failed to get response');
+      }
 
-    // Default response
-    return "I'm your study assistant! I can help you with questions about your courses, study tips, quiz results, and learning progress. What would you like to know?";
+      const data = await response.json();
+
+      // Remove loading message and add actual response
+      setMessages((prev) => {
+        const filtered = prev.filter((msg) => !msg.isLoading);
+        return [
+          ...filtered,
+          {
+            id: (Date.now() + 2).toString(),
+            text: data.response,
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ];
+      });
+    } catch (error) {
+      console.error('Error getting chatbot response:', error);
+      
+      // Remove loading message and add error response
+      setMessages((prev) => {
+        const filtered = prev.filter((msg) => !msg.isLoading);
+        return [
+          ...filtered,
+          {
+            id: (Date.now() + 2).toString(),
+            text: "I'm having trouble connecting right now. Please try again in a moment! 🔄",
+            sender: 'bot',
+            timestamp: new Date(),
+          },
+        ];
+      });
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isTyping) {
       handleSendMessage();
     }
   };
@@ -193,19 +243,31 @@ export default function Chatbot() {
                       className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-sm ${
                         message.sender === 'user'
                           ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-br-sm'
+                          : message.isLoading
+                          ? 'bg-white text-gray-800 rounded-bl-sm animate-pulse'
                           : 'bg-white text-gray-800 rounded-bl-sm'
                       }`}
                     >
-                      <p className="text-sm leading-relaxed">{message.text}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
-                      }`}>
-                        {message.timestamp.toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
-                      </p>
+                      {message.isLoading ? (
+                        <div className="flex space-x-2 py-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm leading-relaxed whitespace-pre-line">{message.text}</p>
+                          <p className={`text-xs mt-1 ${
+                            message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
+                          }`}>
+                            {message.timestamp.toLocaleTimeString('en-US', { 
+                              hour: 'numeric', 
+                              minute: '2-digit',
+                              hour12: true 
+                            })}
+                          </p>
+                        </>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -224,27 +286,31 @@ export default function Chatbot() {
                   />
                   <button
                     onClick={handleSendMessage}
-                    disabled={!inputValue.trim()}
+                    disabled={!inputValue.trim() || isTyping}
                     className="w-10 h-10 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-full flex items-center justify-center hover:from-purple-600 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all duration-200 shadow-md"
                     aria-label="Send message"
                   >
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                      />
-                    </svg>
+                    {isTyping ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                        />
+                      </svg>
+                    )}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-2 text-center">
-                  This is an AI-powered assistant. Responses are automated and may not always be accurate or complete.
+                  ✨ AI-powered study assistant • Responses may vary
                 </p>
               </div>
             </div>

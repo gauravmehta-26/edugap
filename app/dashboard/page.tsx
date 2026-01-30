@@ -173,8 +173,12 @@ export default function DashboardPage() {
         </motion.div>
       </motion.div>
 
-      {/* Chatbot */}
-      <Chatbot />
+      {/* Chatbot with context */}
+      <Chatbot 
+        subject={selectedSubject || undefined}
+        context="dashboard"
+        weakConcepts={weakConcepts.map(c => c.name)}
+      />
     </div>
   );
 }

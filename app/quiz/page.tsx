@@ -7,8 +7,8 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import SubjectHeader from '@/components/ui/SubjectHeader';
 import { quizQuestionsBySubject } from '@/lib/mockData';
-import { QuizAnswer, SubjectId } from '@/lib/types';
-import { analyzeQuiz } from '@/lib/api';
+import { QuizAnswer, SubjectId, QuizQuestion } from '@/lib/types';
+import { analyzeQuiz, generateQuiz } from '@/lib/api';
 import { useSubject } from '@/lib/SubjectContext';
 
 export default function QuizPage() {
@@ -17,6 +17,9 @@ export default function QuizPage() {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [isLoadingQuestions, setIsLoadingQuestions] = useState(true);
+  const [quizSource, setQuizSource] = useState<string>('mock');
   const router = useRouter();
   const { selectedSubject, getSubjectInfo } = useSubject();
 
@@ -37,20 +40,45 @@ export default function QuizPage() {
     }
   }, [selectedSubject, router]);
 
-  // Get subject-specific questions
-  const quizQuestions = selectedSubject ? quizQuestionsBySubject[selectedSubject] : [];
+  // Fetch AI-generated quiz questions
+  useEffect(() => {
+    if (!selectedSubject) return;
+
+    const fetchQuestions = async () => {
+      setIsLoadingQuestions(true);
+      try {
+        console.log(`Fetching AI quiz questions for ${selectedSubject}...`);
+        const result = await generateQuiz(selectedSubject, 5);
+        setQuizQuestions(result.questions);
+        setQuizSource(result.source);
+        console.log(`Quiz loaded from ${result.source}`);
+      } catch (error) {
+        console.error('Failed to fetch AI questions, using mock data:', error);
+        // Fallback to mock data
+        setQuizQuestions(quizQuestionsBySubject[selectedSubject] || []);
+        setQuizSource('mock-fallback');
+      } finally {
+        setIsLoadingQuestions(false);
+      }
+    };
+
+    fetchQuestions();
+  }, [selectedSubject]);
+
   const subjectInfo = selectedSubject ? getSubjectInfo(selectedSubject) : null;
 
   const currentQuestion = quizQuestions[currentQuestionIndex];
   const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
 
-  // Don't render if no subject or no questions
-  if (!selectedSubject || quizQuestions.length === 0 || isRedirecting) {
+  // Don't render if no subject or loading
+  if (!selectedSubject || isLoadingQuestions || quizQuestions.length === 0 || isRedirecting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">
+            {isLoadingQuestions ? 'Generating quiz questions...' : 'Loading...'}
+          </p>
         </div>
       </div>
     );
@@ -62,10 +90,12 @@ export default function QuizPage() {
 
   const handleNext = async () => {
     if (selectedOption !== null) {
-      // Store the answer
+      // Store the answer with correct answer and topic for AI analysis
       const newAnswer: QuizAnswer = {
         questionId: currentQuestion.id,
         selectedOption: selectedOption,
+        correctAnswer: currentQuestion.correctAnswer,
+        topic: currentQuestion.topic || currentQuestion.subject,
       };
       
       const updatedAnswers = [...answers];
@@ -85,7 +115,7 @@ export default function QuizPage() {
         // Submit quiz to backend and navigate to dashboard
         setIsSubmitting(true);
         try {
-          const result = await analyzeQuiz(updatedAnswers);
+          const result = await analyzeQuiz(updatedAnswers, selectedSubject);
           
           // Store result in sessionStorage for dashboard to access
           sessionStorage.setItem('quizResult', JSON.stringify(result));
@@ -123,6 +153,11 @@ export default function QuizPage() {
           <p className="text-sm sm:text-base text-gray-600">
             Answer all questions to identify your learning gaps
           </p>
+          {quizSource === 'ai' && (
+            <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 text-xs font-medium text-blue-800">
+              <span className="mr-1">✨</span> AI-Generated Questions
+            </div>
+          )}
         </motion.div>
 
         <Card className="backdrop-blur-sm bg-white/90">

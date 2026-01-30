@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { invokeClaude } from "@/src/lib/bedrock";
+import { analyzeQuizResults, isGroqConfigured } from "@/lib/groq-ai";
 
 interface QuizAnswer {
   questionId: number | string;
   selectedOption: number;
+  correctAnswer?: number;
+  topic?: string;
   questionText?: string;
   options?: string[];
 }
@@ -41,6 +43,28 @@ const QUESTION_CONCEPTS: Record<string, string> = {
   q5: "Electrostatics",
 };
 
+// Generate intelligent summary based on performance
+function generateSummary(
+  wrongCount: number,
+  totalQuestions: number,
+  weakConcepts: string[],
+  subject?: string,
+): string {
+  const percentage = ((totalQuestions - wrongCount) / totalQuestions) * 100;
+
+  if (wrongCount === 0) {
+    return `Outstanding performance in ${subject || "this quiz"}! You've demonstrated mastery of all concepts with 100% accuracy. Keep up the excellent work!`;
+  } else if (wrongCount === 1) {
+    return `Strong performance with ${percentage.toFixed(0)}% accuracy. You have a solid grasp of ${subject || "the material"}, with only minor gaps in ${weakConcepts.join(", ")}. A quick review should solidify your understanding.`;
+  } else if (wrongCount === 2) {
+    return `Moderate performance with ${percentage.toFixed(0)}% accuracy. You understand the basics but need focused practice in ${weakConcepts.join(" and ")}. These concepts are crucial for ${subject || "your success"}.`;
+  } else if (wrongCount === 3) {
+    return `Your performance shows significant gaps in ${weakConcepts.join(", ")}. With ${percentage.toFixed(0)}% accuracy, immediate attention to these weak areas is recommended to prevent falling behind in ${subject || "this subject"}.`;
+  } else {
+    return `Critical learning gaps detected with only ${percentage.toFixed(0)}% accuracy. Multiple concepts (${weakConcepts.join(", ")}) require immediate remediation. Consider seeking additional help and dedicating focused study time to ${subject || "these topics"}.`;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: AnalyzeRequest = await request.json();
@@ -63,118 +87,112 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Analyze answers using mock data
+    // Analyze answers - use correctAnswer from the answer object if available
     let wrongCount = 0;
     const weakConcepts: string[] = [];
-    const incorrectQuestions: Array<{
-      questionId: string;
-      concept: string;
-      selectedOption: number;
-      correctOption: number;
-    }> = [];
 
     body.answers.forEach((answer) => {
       const qId = String(answer.questionId);
-      const correctAnswer = CORRECT_ANSWERS[qId];
+      
+      // Use correctAnswer from the answer object (for AI-generated questions)
+      // or fall back to CORRECT_ANSWERS map (for mock questions)
+      const correctAnswer = answer.correctAnswer !== undefined 
+        ? answer.correctAnswer 
+        : CORRECT_ANSWERS[qId];
 
-      if (
-        correctAnswer !== undefined &&
-        answer.selectedOption !== correctAnswer
-      ) {
+      if (correctAnswer !== undefined && answer.selectedOption !== correctAnswer) {
         wrongCount++;
-        const concept = QUESTION_CONCEPTS[qId];
+        
+        // Use topic from answer object (for AI-generated questions)
+        // or fall back to QUESTION_CONCEPTS map (for mock questions)
+        const concept = answer.topic || QUESTION_CONCEPTS[qId];
         if (concept && !weakConcepts.includes(concept)) {
           weakConcepts.push(concept);
         }
-        incorrectQuestions.push({
-          questionId: qId,
-          concept,
-          selectedOption: answer.selectedOption,
-          correctOption: correctAnswer,
-        });
       }
     });
 
     const totalQuestions = body.answers.length;
     const correctAnswers = totalQuestions - wrongCount;
 
-    // Use AI to generate intelligent analysis
-    try {
-      const systemPrompt = `You are an educational assessment expert. Analyze student quiz performance and provide insights about their learning gaps and failure risk.`;
+    // Try to use AI analysis if Groq is configured
+    if (isGroqConfigured() && body.subject) {
+      try {
+        console.log(`[GROQ AI] Analyzing ${body.subject} quiz: ${correctAnswers}/${totalQuestions} correct`);
+        console.log(`[GROQ AI] Weak concepts identified: ${weakConcepts.join(', ') || 'None'}`);
+        
+        const aiAnalysis = await analyzeQuizResults(
+          body.subject,
+          correctAnswers,
+          totalQuestions,
+          weakConcepts
+        );
 
-      const prompt = `
-A student completed a ${body.subject || "general"} quiz with the following results:
-- Total Questions: ${totalQuestions}
-- Correct Answers: ${correctAnswers}
-- Incorrect Answers: ${wrongCount}
-- Weak Concepts Identified: ${weakConcepts.join(", ") || "None"}
+        console.log(`[GROQ AI] AI analysis complete - Failure risk: ${aiAnalysis.failureRisk}%`);
 
-Incorrect Questions:
-${incorrectQuestions.map((q) => `- Question ${q.questionId} (${q.concept}): Selected option ${q.selectedOption}, Correct option ${q.correctOption}`).join("\n")}
+        // Stable ordering of weak concepts
+        weakConcepts.sort();
 
-Please provide:
-1. A failure risk percentage (0-100) based on the performance
-2. A brief summary (2-3 sentences) explaining the student's performance and areas of concern
+        const response = {
+          failureRisk: Math.min(Math.round(aiAnalysis.failureRisk), 100),
+          weakConcepts,
+          summary: aiAnalysis.summary,
+          correctAnswers,
+          totalQuestions,
+          recommendations: aiAnalysis.recommendations,
+          source: "ai",
+        };
 
-Respond in JSON format:
-{
-  "failureRisk": <number 0-100>,
-  "summary": "<string>"
-}`;
-
-      const aiResponse = await invokeClaude(prompt, systemPrompt);
-
-      // Parse AI response
-      const aiAnalysis = JSON.parse(aiResponse);
-
-      // Stable ordering of weak concepts
-      weakConcepts.sort();
-
-      const response = {
-        failureRisk: Math.min(Math.max(aiAnalysis.failureRisk, 0), 100),
-        weakConcepts,
-        summary: aiAnalysis.summary,
-        correctAnswers,
-        totalQuestions,
-      };
-
-      return NextResponse.json(response, { status: 200 });
-    } catch (aiError) {
-      console.error("AI analysis failed, using fallback logic:", aiError);
-
-      // Fallback to rule-based analysis if AI fails
-      let failureRisk: number;
-      let summary: string;
-
-      if (wrongCount === 0) {
-        failureRisk = 5;
-        summary = "Excellent performance! Very low risk.";
-      } else if (wrongCount === 1) {
-        failureRisk = 25;
-        summary = "Good performance with minor gaps.";
-      } else if (wrongCount === 2) {
-        failureRisk = 50;
-        summary = "Moderate risk. Focus on weak areas.";
-      } else if (wrongCount === 3) {
-        failureRisk = 75;
-        summary = "High risk due to multiple weak concepts.";
-      } else {
-        failureRisk = 90;
-        summary = "Critical risk. Immediate attention needed.";
+        return NextResponse.json(response, { status: 200 });
+      } catch (error) {
+        console.error("[GROQ AI] Error using AI analysis:", error);
+        console.error("[GROQ AI] Falling back to rule-based analysis");
+        // Fall through to rule-based analysis
       }
-
-      weakConcepts.sort();
-
-      const response = {
-        failureRisk: Math.min(failureRisk, 100),
-        weakConcepts,
-        summary,
-        correctAnswers,
-        totalQuestions,
-      };
-
-      return NextResponse.json(response, { status: 200 });
+    } else {
+      if (!isGroqConfigured()) {
+        console.log("[GROQ AI] Groq not configured, using rule-based analysis");
+      }
+      if (!body.subject) {
+        console.log("[GROQ AI] No subject provided, using rule-based analysis");
+      }
     }
+
+    // Fallback: Calculate failure risk based on performance (rule-based)
+    let failureRisk: number;
+    if (wrongCount === 0) {
+      failureRisk = 5;
+    } else if (wrongCount === 1) {
+      failureRisk = 25;
+    } else if (wrongCount === 2) {
+      failureRisk = 50;
+    } else if (wrongCount === 3) {
+      failureRisk = 75;
+    } else {
+      failureRisk = 90;
+    }
+
+    // Generate intelligent summary
+    const summary = generateSummary(
+      wrongCount,
+      totalQuestions,
+      weakConcepts,
+      body.subject,
+    );
+
+    // Stable ordering of weak concepts
+    weakConcepts.sort();
+
+    const response = {
+      failureRisk: Math.min(failureRisk, 100),
+      weakConcepts,
+      summary,
+      correctAnswers,
+      totalQuestions,
+      source: "rule-based",
+    };
+
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     console.error("Error in /api/analyze:", error);
     return NextResponse.json(
