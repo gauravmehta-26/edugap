@@ -52,7 +52,7 @@ Edit `.env.local` in your project root:
 
 ```bash
 # Groq AI Configuration (FREE - No Credit Card!)
-GROQ_API_KEY=gsk_your_api_key_here
+GROQ_API_KEY=YOUR_API_KEY_HERE
 
 # MongoDB (Optional)
 MONGODB_URI=mongodb://localhost:27017/edugap
@@ -211,7 +211,7 @@ Complete remediation shown
 
 ```bash
 # Required
-GROQ_API_KEY=gsk_your_key_here
+GROQ_API_KEY=YOUR_API_KEY_HERE
 
 # Optional (defaults shown)
 GROQ_MODEL=llama-3.1-70b-versatile

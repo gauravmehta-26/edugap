@@ -17,7 +17,7 @@ npm run test:groq
 **Expected Output:**
 
 ```
-✅ API Key found: gsk_RV7Q4Hiyyp8809KL...
+✅ API Key found: YOUR_API_KEY_HERE...
 ✅ API Response: Hello from Groq!
 ✅ Quiz Question Generated
 ✅ All tests passed! Groq AI is working correctly.
