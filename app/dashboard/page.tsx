@@ -1,13 +1,103 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { dashboardData } from '@/lib/mockData';
+import { dashboardData, weakConceptsBySubject, subjectPerformanceBySubject } from '@/lib/mockData';
 import RiskCard from '@/components/dashboard/RiskCard';
 import WeakConceptsList from '@/components/dashboard/WeakConceptsList';
 import PerformanceCharts from '@/components/dashboard/PerformanceCharts';
 import Chatbot from '@/components/ui/Chatbot';
+import SubjectHeader from '@/components/ui/SubjectHeader';
+import { AnalyzeResponse } from '@/lib/api';
+import { useSubject } from '@/lib/SubjectContext';
+import { SubjectId } from '@/lib/types';
 
 export default function DashboardPage() {
+  const { selectedSubject, getSubjectInfo } = useSubject();
+  const router = useRouter();
+  const [quizResult, setQuizResult] = useState<AnalyzeResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Redirect to profile if no subject is selected
+  useEffect(() => {
+    if (!selectedSubject) {
+      setIsRedirecting(true);
+      router.push('/profile');
+      return;
+    }
+
+    // Validate subject ID - if invalid, clear state and redirect
+    const validSubjects: SubjectId[] = ['physics', 'mathematics', 'chemistry', 'biology'];
+    if (!validSubjects.includes(selectedSubject)) {
+      console.error('Invalid subject ID detected, redirecting to profile');
+      setIsRedirecting(true);
+      router.push('/profile');
+    }
+  }, [selectedSubject, router]);
+
+  useEffect(() => {
+    // Try to get quiz result from sessionStorage
+    const storedResult = sessionStorage.getItem('quizResult');
+    if (storedResult) {
+      try {
+        const result = JSON.parse(storedResult);
+        console.log('Loaded quiz result from sessionStorage:', result);
+        setQuizResult(result);
+      } catch (error) {
+        console.error('Failed to parse quiz result:', error);
+      }
+    } else {
+      console.log('No quiz result in sessionStorage, using mock data');
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Use API result if available, otherwise fall back to subject-specific mock data
+  const subjectWeakConcepts = selectedSubject ? weakConceptsBySubject[selectedSubject] : [];
+  const subjectPerformance = selectedSubject ? subjectPerformanceBySubject[selectedSubject] : dashboardData.subjectPerformance;
+  
+  // Calculate subject-specific risk percentage (average of weak concept risks)
+  const subjectRiskPercentage = subjectWeakConcepts.length > 0
+    ? Math.round(subjectWeakConcepts.reduce((sum, concept) => sum + (concept.riskPercentage || 0), 0) / subjectWeakConcepts.length)
+    : dashboardData.examFailureRisk;
+  
+  // Use quiz result if available, otherwise use mock data
+  const riskPercentage = (quizResult?.failureRisk !== undefined && quizResult?.failureRisk !== null) 
+    ? quizResult.failureRisk 
+    : subjectRiskPercentage;
+    
+  const weakConcepts = (quizResult?.weakConcepts && quizResult.weakConcepts.length > 0)
+    ? quizResult.weakConcepts.map((concept, index) => ({
+        id: `concept-${index}`,
+        name: concept,
+        riskPercentage: 75, // Default risk for API-provided concepts
+        subject: selectedSubject!,
+      }))
+    : subjectWeakConcepts;
+
+  // Calculate actual score from quiz result
+  const actualScore = quizResult 
+    ? Math.round((quizResult.correctAnswers / quizResult.totalQuestions) * 100)
+    : null;
+
+  // Debug logging
+  console.log('Dashboard data:', {
+    selectedSubject,
+    hasQuizResult: !!quizResult,
+    quizResultFailureRisk: quizResult?.failureRisk,
+    actualScore,
+    subjectRiskPercentage,
+    finalRiskPercentage: riskPercentage,
+    weakConceptsCount: weakConcepts.length,
+    weakConceptsData: weakConcepts,
+    performanceDataPoints: subjectPerformance.length
+  });
+
+  // Get subject info for display
+  const subjectInfo = selectedSubject ? getSubjectInfo(selectedSubject) : null;
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -27,8 +117,19 @@ export default function DashboardPage() {
     },
   };
 
+  if (isLoading || isRedirecting) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading your results...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-4 sm:p-6 lg:p-8">
       <motion.div
         className="max-w-7xl mx-auto"
         variants={containerVariants}
@@ -40,13 +141,13 @@ export default function DashboardPage() {
           className="text-center mb-8 sm:mb-12"
           variants={itemVariants}
         >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-xl">
-            <span className="text-3xl">📊</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
+          {subjectInfo && (
+            <SubjectHeader subject={subjectInfo} className="mb-4" />
+          )}
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
             Your Learning Dashboard
           </h1>
-          <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
             Track your progress and identify areas for improvement
           </p>
         </motion.div>
@@ -57,21 +158,30 @@ export default function DashboardPage() {
           variants={itemVariants}
         >
           <div className="lg:col-span-1">
-            <RiskCard riskPercentage={dashboardData.examFailureRisk} />
+            <RiskCard riskPercentage={riskPercentage} />
           </div>
           <div className="lg:col-span-2">
-            <WeakConceptsList concepts={dashboardData.weakConcepts} />
+            <WeakConceptsList concepts={weakConcepts} />
           </div>
         </motion.div>
 
         {/* Charts section */}
         <motion.div variants={itemVariants}>
-          <PerformanceCharts subjectPerformance={dashboardData.subjectPerformance} />
+          <PerformanceCharts 
+            subjectPerformance={subjectPerformance} 
+            actualScore={actualScore}
+            selectedSubject={selectedSubject}
+            quizResult={quizResult}
+          />
         </motion.div>
       </motion.div>
 
-      {/* Chatbot */}
-      <Chatbot />
+      {/* Chatbot with context */}
+      <Chatbot 
+        subject={selectedSubject || undefined}
+        context="dashboard"
+        weakConcepts={weakConcepts.map(c => c.name)}
+      />
     </div>
   );
 }

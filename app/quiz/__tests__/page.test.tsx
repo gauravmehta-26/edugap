@@ -2,6 +2,8 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { useRouter } from 'next/navigation';
 import QuizPage from '../page';
 import * as fc from 'fast-check';
+import { SubjectProvider } from '@/lib/SubjectContext';
+import { ReactNode } from 'react';
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -16,6 +18,21 @@ jest.mock('framer-motion', () => ({
   },
   AnimatePresence: ({ children }: any) => <>{children}</>,
 }));
+
+// Mock SubjectContext with a selected subject
+jest.mock('@/lib/SubjectContext', () => {
+  const actual = jest.requireActual('@/lib/SubjectContext');
+  return {
+    ...actual,
+    useSubject: jest.fn(() => ({
+      selectedSubject: 'mathematics',
+      setSelectedSubject: jest.fn(),
+      getSubjectInfo: actual.subjects.find((s: any) => s.id === 'mathematics') 
+        ? () => actual.subjects.find((s: any) => s.id === 'mathematics')
+        : jest.fn(),
+    })),
+  };
+});
 
 describe('QuizPage', () => {
   let mockPush: jest.Mock;

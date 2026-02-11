@@ -1,7 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import RemediationPage from '../page';
-import { remediationContent } from '@/lib/mockData';
+import { remediationContentBySubject } from '@/lib/mockData';
+import { SubjectProvider } from '@/lib/SubjectContext';
+import { ReactNode } from 'react';
 
 // Mock next/navigation
 jest.mock('next/navigation', () => ({
@@ -16,6 +18,21 @@ jest.mock('framer-motion', () => ({
     button: ({ children, ...props }: any) => <button {...props}>{children}</button>,
   },
 }));
+
+// Mock SubjectContext with a selected subject
+jest.mock('@/lib/SubjectContext', () => {
+  const actual = jest.requireActual('@/lib/SubjectContext');
+  return {
+    ...actual,
+    useSubject: jest.fn(() => ({
+      selectedSubject: 'mathematics',
+      setSelectedSubject: jest.fn(),
+      getSubjectInfo: actual.subjects.find((s: any) => s.id === 'mathematics') 
+        ? () => actual.subjects.find((s: any) => s.id === 'mathematics')
+        : jest.fn(),
+    })),
+  };
+});
 
 describe('Remediation Page', () => {
   let mockPush: jest.Mock;
@@ -39,16 +56,18 @@ describe('Remediation Page', () => {
   });
 
   describe('Unit Tests', () => {
-    it('displays concept content correctly for valid concept ID', () => {
-      // Test with electrostatics concept
-      mockGet.mockReturnValue('electrostatics');
+    it('displays concept content correctly for valid concept ID', async () => {
+      // Test with calculus concept (mathematics subject)
+      mockGet.mockReturnValue('calculus');
       
       render(<RemediationPage />);
       
-      const content = remediationContent['electrostatics'];
+      const content = remediationContentBySubject.mathematics['calculus'];
       
-      // Verify concept name is displayed as heading
-      expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      // Wait for content to load
+      await waitFor(() => {
+        expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      });
       
       // Verify explanation section is displayed
       expect(screen.getByText('Explanation')).toBeInTheDocument();
@@ -66,52 +85,64 @@ describe('Remediation Page', () => {
       expect(screen.getByRole('button', { name: /mark as fixed/i })).toBeInTheDocument();
     });
 
-    it('displays concept content correctly for trigonometry concept', () => {
+    it('displays concept content correctly for trigonometry concept', async () => {
       mockGet.mockReturnValue('trigonometry');
       
       render(<RemediationPage />);
       
-      const content = remediationContent['trigonometry'];
+      const content = remediationContentBySubject.mathematics['trigonometry'];
       
-      expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      });
+      
       expect(screen.getByText(content.explanation)).toBeInTheDocument();
       expect(screen.getByText(content.example)).toBeInTheDocument();
       expect(screen.getByText(content.commonMistake)).toBeInTheDocument();
     });
 
-    it('displays concept content correctly for calculus concept', () => {
+    it('displays concept content correctly for calculus concept', async () => {
       mockGet.mockReturnValue('calculus');
       
       render(<RemediationPage />);
       
-      const content = remediationContent['calculus'];
+      const content = remediationContentBySubject.mathematics['calculus'];
       
-      expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      });
+      
       expect(screen.getByText(content.explanation)).toBeInTheDocument();
       expect(screen.getByText(content.example)).toBeInTheDocument();
       expect(screen.getByText(content.commonMistake)).toBeInTheDocument();
     });
 
-    it('displays concept content correctly for quadratic concept', () => {
-      mockGet.mockReturnValue('quadratic');
+    it('displays concept content correctly for algebra concept', async () => {
+      mockGet.mockReturnValue('algebra');
       
       render(<RemediationPage />);
       
-      const content = remediationContent['quadratic'];
+      const content = remediationContentBySubject.mathematics['algebra'];
       
-      expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText(content.conceptName)).toBeInTheDocument();
+      });
+      
       expect(screen.getByText(content.explanation)).toBeInTheDocument();
       expect(screen.getByText(content.example)).toBeInTheDocument();
       expect(screen.getByText(content.commonMistake)).toBeInTheDocument();
     });
 
-    it('shows "Concept Not Found" message for invalid concept ID', () => {
+    it('shows "Concept Not Found" message for invalid concept ID', async () => {
       mockGet.mockReturnValue('invalid-concept-id');
       
       render(<RemediationPage />);
       
-      // Verify "not found" message is displayed
-      expect(screen.getByText('Concept Not Found')).toBeInTheDocument();
+      // Wait for error state to render
+      await waitFor(() => {
+        expect(screen.getByText('Concept Not Found')).toBeInTheDocument();
+      });
+      
       expect(screen.getByText(/the concept you're looking for doesn't exist/i)).toBeInTheDocument();
       
       // Verify return to dashboard button is present
@@ -127,10 +158,14 @@ describe('Remediation Page', () => {
       expect(screen.getByRole('button', { name: /return to dashboard/i })).toBeInTheDocument();
     });
 
-    it('navigates to dashboard when "Return to Dashboard" button is clicked', () => {
+    it('navigates to dashboard when "Return to Dashboard" button is clicked', async () => {
       mockGet.mockReturnValue('invalid-concept-id');
       
       render(<RemediationPage />);
+      
+      await waitFor(() => {
+        expect(screen.getByText('Concept Not Found')).toBeInTheDocument();
+      });
       
       const returnButton = screen.getByRole('button', { name: /return to dashboard/i });
       fireEvent.click(returnButton);
@@ -138,10 +173,14 @@ describe('Remediation Page', () => {
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
 
-    it('provides visual feedback when "Mark as Fixed" button is clicked', () => {
-      mockGet.mockReturnValue('electrostatics');
+    it('provides visual feedback when "Mark as Fixed" button is clicked', async () => {
+      mockGet.mockReturnValue('calculus');
       
       render(<RemediationPage />);
+      
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /mark as fixed/i })).toBeInTheDocument();
+      });
       
       const markAsFixedButton = screen.getByRole('button', { name: /mark as fixed/i });
       
@@ -155,10 +194,14 @@ describe('Remediation Page', () => {
       expect(screen.getByText(/great! keep practicing this concept/i)).toBeInTheDocument();
     });
 
-    it('navigates to dashboard when "Back to Dashboard" link is clicked', () => {
-      mockGet.mockReturnValue('electrostatics');
+    it('navigates to dashboard when "Back to Dashboard" link is clicked', async () => {
+      mockGet.mockReturnValue('calculus');
       
       render(<RemediationPage />);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/back to dashboard/i)).toBeInTheDocument();
+      });
       
       const backButton = screen.getByText(/back to dashboard/i);
       fireEvent.click(backButton);
