@@ -28,7 +28,7 @@ export default function ConceptContent({ content }: ConceptContentProps) {
       {/* AI Badge */}
       {content.source === 'ai' && (
         <div className="inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 text-xs font-medium text-blue-800">
-          <span className="mr-1">✨</span> AI-Generated Content
+          <span className="mr-1">✨</span> Premium Content
         </div>
       )}
 
@@ -45,7 +45,7 @@ export default function ConceptContent({ content }: ConceptContentProps) {
         </p>
       </div>
 
-      {/* Key Points Section (AI-generated) */}
+      {/* Key Points Section */}
       {content.keyPoints && content.keyPoints.length > 0 && (
         <div className="space-y-2 sm:space-y-3">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800">Key Points</h2>
@@ -64,7 +64,7 @@ export default function ConceptContent({ content }: ConceptContentProps) {
         </div>
       )}
 
-      {/* Examples Section (AI-generated multiple examples) */}
+      {/* Examples Section */}
       {content.examples && content.examples.length > 0 ? (
         <div className="space-y-2 sm:space-y-3">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800">Examples</h2>
@@ -101,7 +101,7 @@ export default function ConceptContent({ content }: ConceptContentProps) {
         </div>
       )}
 
-      {/* Study Resources Section (AI-generated) */}
+      {/* Study Resources Section */}
       {content.studyResources && content.studyResources.length > 0 && (
         <div className="space-y-2 sm:space-y-3">
           <h2 className="text-lg sm:text-xl font-bold text-gray-800">Study Resources</h2>

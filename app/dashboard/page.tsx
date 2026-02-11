@@ -45,10 +45,6 @@ export default function DashboardPage() {
         const result = JSON.parse(storedResult);
         console.log('Loaded quiz result from sessionStorage:', result);
         setQuizResult(result);
-        
-        // Clear the stored result so it doesn't interfere with future quizzes
-        // Comment this out if you want results to persist across page refreshes
-        sessionStorage.removeItem('quizResult');
       } catch (error) {
         console.error('Failed to parse quiz result:', error);
       }
@@ -67,29 +63,31 @@ export default function DashboardPage() {
     ? Math.round(subjectWeakConcepts.reduce((sum, concept) => sum + (concept.riskPercentage || 0), 0) / subjectWeakConcepts.length)
     : dashboardData.examFailureRisk;
   
-  // TODO: API needs to be updated to handle subject-specific questions
-  // For now, always use subject-specific mock data since API doesn't know about subjects
-  // Use API result if available and has data, otherwise use subject-specific mock data
-  // const riskPercentage = (quizResult?.failureRisk !== undefined && quizResult?.failureRisk !== null) 
-  //   ? quizResult.failureRisk 
-  //   : subjectRiskPercentage;
-  const riskPercentage = subjectRiskPercentage; // Always use subject-specific data
+  // Use quiz result if available, otherwise use mock data
+  const riskPercentage = (quizResult?.failureRisk !== undefined && quizResult?.failureRisk !== null) 
+    ? quizResult.failureRisk 
+    : subjectRiskPercentage;
     
-  // const weakConcepts = (quizResult?.weakConcepts && quizResult.weakConcepts.length > 0)
-  //   ? quizResult.weakConcepts.map((concept, index) => ({
-  //       id: `concept-${index}`,
-  //       name: concept,
-  //       riskPercentage: 75, // Default risk for API-provided concepts
-  //       subject: selectedSubject!,
-  //     }))
-  //   : subjectWeakConcepts;
-  const weakConcepts = subjectWeakConcepts; // Always use subject-specific data
+  const weakConcepts = (quizResult?.weakConcepts && quizResult.weakConcepts.length > 0)
+    ? quizResult.weakConcepts.map((concept, index) => ({
+        id: `concept-${index}`,
+        name: concept,
+        riskPercentage: 75, // Default risk for API-provided concepts
+        subject: selectedSubject!,
+      }))
+    : subjectWeakConcepts;
+
+  // Calculate actual score from quiz result
+  const actualScore = quizResult 
+    ? Math.round((quizResult.correctAnswers / quizResult.totalQuestions) * 100)
+    : null;
 
   // Debug logging
   console.log('Dashboard data:', {
     selectedSubject,
     hasQuizResult: !!quizResult,
     quizResultFailureRisk: quizResult?.failureRisk,
+    actualScore,
     subjectRiskPercentage,
     finalRiskPercentage: riskPercentage,
     weakConceptsCount: weakConcepts.length,
@@ -131,7 +129,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 p-4 sm:p-6 lg:p-8">
       <motion.div
         className="max-w-7xl mx-auto"
         variants={containerVariants}
@@ -146,10 +144,10 @@ export default function DashboardPage() {
           {subjectInfo && (
             <SubjectHeader subject={subjectInfo} className="mb-4" />
           )}
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
             Your Learning Dashboard
           </h1>
-          <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">
+          <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto">
             Track your progress and identify areas for improvement
           </p>
         </motion.div>
@@ -169,7 +167,12 @@ export default function DashboardPage() {
 
         {/* Charts section */}
         <motion.div variants={itemVariants}>
-          <PerformanceCharts subjectPerformance={subjectPerformance} />
+          <PerformanceCharts 
+            subjectPerformance={subjectPerformance} 
+            actualScore={actualScore}
+            selectedSubject={selectedSubject}
+            quizResult={quizResult}
+          />
         </motion.div>
       </motion.div>
 

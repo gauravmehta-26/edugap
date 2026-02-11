@@ -40,7 +40,7 @@ export default function QuizPage() {
     }
   }, [selectedSubject, router]);
 
-  // Fetch AI-generated quiz questions
+  // Fetch quiz questions
   useEffect(() => {
     if (!selectedSubject) return;
 
@@ -86,6 +86,15 @@ export default function QuizPage() {
 
   const handleOptionSelect = (optionIndex: number) => {
     setSelectedOption(optionIndex);
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
+      // Load the previously selected answer if it exists
+      const previousAnswer = answers.find(a => a.questionId === quizQuestions[currentQuestionIndex - 1].id);
+      setSelectedOption(previousAnswer ? previousAnswer.selectedOption : null);
+    }
   };
 
   const handleNext = async () => {
@@ -155,7 +164,7 @@ export default function QuizPage() {
           </p>
           {quizSource === 'ai' && (
             <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 text-xs font-medium text-blue-800">
-              <span className="mr-1">✨</span> AI-Generated Questions
+              <span className="mr-1">✨</span> Premium Questions
             </div>
           )}
         </motion.div>
@@ -241,14 +250,26 @@ export default function QuizPage() {
                 ))}
               </div>
 
-              <Button
-                onClick={handleNext}
-                variant="primary"
-                fullWidth
-                disabled={selectedOption === null || isSubmitting}
-              >
-                {isSubmitting ? 'Analyzing...' : isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
-              </Button>
+              {/* Navigation Buttons */}
+              <div className="flex gap-4">
+                {currentQuestionIndex > 0 && (
+                  <Button
+                    onClick={handlePrevious}
+                    variant="secondary"
+                    className="flex-1"
+                  >
+                    ← Previous
+                  </Button>
+                )}
+                <Button
+                  onClick={handleNext}
+                  variant="primary"
+                  className={currentQuestionIndex === 0 ? 'w-full' : 'flex-1'}
+                  disabled={selectedOption === null || isSubmitting}
+                >
+                  {isSubmitting ? 'Analyzing...' : isLastQuestion ? '✓ Submit Quiz' : 'Next Question →'}
+                </Button>
+              </div>
             </motion.div>
           </AnimatePresence>
         </Card>

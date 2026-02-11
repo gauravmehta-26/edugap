@@ -3,12 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import Card from '@/components/ui/Card';
-import Input from '@/components/ui/Input';
-import Button from '@/components/ui/Button';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const router = useRouter();
 
   const isValidEmail = (email: string): boolean => {
@@ -16,93 +14,66 @@ export default function LoginPage() {
     return emailRegex.test(email);
   };
 
-  const handleLogin = () => {
-    if (isValidEmail(email)) {
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isValidEmail(email) && password.length > 0) {
       router.push('/profile');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-md"
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-sm"
       >
-        {/* Logo/Brand Section */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <span className="text-3xl font-bold text-white">E</span>
+        <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900">Sign In</h1>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
-            EduGap
-          </h1>
-          <p className="text-base sm:text-lg text-gray-600 font-medium">
-            Identify and close your learning gaps
-          </p>
-        </motion.div>
 
-        <Card className="w-full backdrop-blur-sm bg-white/90">
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome Back
-              </h2>
-              <p className="text-sm text-gray-600">
-                Enter your email to continue your learning journey
-              </p>
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-2">
+                Login
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder-slate-400"
+                required
+              />
             </div>
 
-            <Input
-              type="email"
-              label="Email Address"
-              placeholder="you@example.com"
-              value={email}
-              onChange={setEmail}
-              id="email-input"
-            />
-
-            <Button
-              onClick={handleLogin}
-              variant="primary"
-              fullWidth
-              disabled={!isValidEmail(email)}
-            >
-              Continue to Dashboard
-            </Button>
-
-            <div className="text-center text-xs text-gray-500">
-              By continuing, you agree to our Terms of Service
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-900 placeholder-slate-400"
+                required
+              />
             </div>
           </div>
-        </Card>
 
-        {/* Features Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="mt-8 grid grid-cols-3 gap-4 text-center"
-        >
-          <div>
-            <div className="text-2xl mb-1">📊</div>
-            <p className="text-xs text-gray-600 font-medium">Track Progress</p>
-          </div>
-          <div>
-            <div className="text-2xl mb-1">🎯</div>
-            <p className="text-xs text-gray-600 font-medium">Identify Gaps</p>
-          </div>
-          <div>
-            <div className="text-2xl mb-1">🚀</div>
-            <p className="text-xs text-gray-600 font-medium">Improve Fast</p>
-          </div>
-        </motion.div>
+          <button
+            type="submit"
+            disabled={!isValidEmail(email) || password.length === 0}
+            className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 disabled:bg-slate-300 disabled:cursor-not-allowed transition-all"
+          >
+            Sign In
+          </button>
+        </form>
       </motion.div>
     </div>
   );
